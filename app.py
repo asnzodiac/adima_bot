@@ -11,13 +11,13 @@ application = setup_bot(TELEGRAM_TOKEN)
 
 @app.route("/")
 def index():
-    return jsonify({"status": "Bot running ✅"})
+    return "Bot is running ✅"
 
 @app.route("/webhook", methods=["POST"])
-async def webhook():
+def webhook():
     data = request.get_json(force=True)
     update = Update.de_json(data, application.bot)
-    await application.process_update(update)
+    application.create_task(application.process_update(update))
     return jsonify({"ok": True})
 
 @app.route("/setwebhook")
