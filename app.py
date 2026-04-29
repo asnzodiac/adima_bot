@@ -8,13 +8,14 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 app = Flask(__name__)
 
-# ✅ Create dedicated asyncio event loop
+# ✅ Create dedicated asyncio loop
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 
+# ✅ Setup telegram application
 application = setup_bot(TELEGRAM_TOKEN)
 
-# ✅ Initialize telegram application properly
+# ✅ Initialize & start telegram app
 loop.run_until_complete(application.initialize())
 loop.run_until_complete(application.start())
 
@@ -30,16 +31,10 @@ def webhook():
         data = request.get_json(force=True)
         update = Update.de_json(data, application.bot)
 
-        # ✅ Run async processing inside our loop
+        # ✅ Run inside event loop
         loop.create_task(application.process_update(update))
 
         return jsonify({"ok": True})
     except Exception as e:
-        print("Webhook error:", e)
+        print("🔥 Webhook error:", e)
         return jsonify({"ok": False}), 200
-
-
-@app.route("/shutdown")
-def shutdown():
-    loop.run_until_complete(application.stop())
-    return "Shutting down..."
