@@ -2,7 +2,10 @@ import os
 import requests
 import itertools
 
-# Load keys
+# ==========================
+# LOAD API KEYS
+# ==========================
+
 GROQ_KEYS = [
     os.getenv("GROQ_API_KEY"),
     os.getenv("GROQ_API_KEY1"),
@@ -13,19 +16,36 @@ GROQ_KEYS = [
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-# Remove None keys
+# Remove empty keys
 GROQ_KEYS = [k for k in GROQ_KEYS if k]
 
-key_cycle = itertools.cycle(GROQ_KEYS)
+if GROQ_KEYS:
+    key_cycle = itertools.cycle(GROQ_KEYS)
+else:
+    key_cycle = None
+
+
+# ==========================
+# CHARACTER PROMPT
+# ==========================
 
 def load_character():
     try:
         with open("character.txt", "r", encoding="utf-8") as f:
             return f.read()
-    except:
+    except Exception as e:
+        print("⚠ character.txt load failed:", e)
         return "You are a helpful assistant."
 
+
+# ==========================
+# GROQ CALL
+# ==========================
+
 def ask_groq(message):
+    if not GROQ_KEYS:
+        raise Exception("No GROQ keys configured.")
+
     system_prompt = load_character()
 
     for _ in range(len(GROQ_KEYS)):
@@ -49,16 +69,33 @@ def ask_groq(message):
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=60,
+                timeout=20,  # ✅ reduced timeout
             )
+
             r.raise_for_status()
-            return r.json()["choices"][0]["message"]["content"]
-        except Exception:
+
+            data = r.json()
+
+            if "choices" in data and data["choices"]:
+                return data["choices"][0]["message"]["content"]
+
+            print("⚠ Unexpected GROQ response:", data)
+
+        except Exception as e:
+            print("⚠ GROQ key failed:", e)
             continue
 
     raise Exception("All GROQ keys failed.")
 
+
+# ==========================
+# OPENROUTER FALLBACK
+# ==========================
+
 def ask_openrouter(message):
+    if not OPENROUTER_API_KEY:
+        raise Exception("No OpenRouter key configured.")
+
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
@@ -71,18 +108,36 @@ def ask_openrouter(message):
         ],
     }
 
-    r = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers=headers,
-        json=payload,
-        timeout=60,
-    )
+    try:
+        r = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=20,
+        )
 
-    r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"]
+        r.raise_for_status()
+
+        data = r.json()
+
+        if "choices" in data and data["choices"]:
+            return data["choices"][0]["message"]["content"]
+
+        print("⚠ Unexpected OpenRouter response:", data)
+
+    except Exception as e:
+        print("⚠ OpenRouter failed:", e)
+
+    return "⚠ AI service is temporarily unavailable."
+
+
+# ==========================
+# MAIN ROUTER
+# ==========================
 
 def ask_llm(message):
     try:
         return ask_groq(message)
-    except:
+    except Exception as e:
+        print("⚠ GROQ failed, switching to OpenRouter:", e)
         return ask_openrouter(message)
