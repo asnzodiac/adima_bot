@@ -14,20 +14,19 @@ asyncio.set_event_loop(loop)
 
 application = setup_bot(TELEGRAM_TOKEN)
 
-# ✅ Proper startup
+# ✅ Initialize only (DO NOT call application.start())
 loop.run_until_complete(application.initialize())
 
-# ✅ Clear old webhook
+# ✅ Reset and set webhook cleanly
 loop.run_until_complete(
     application.bot.delete_webhook(drop_pending_updates=True)
 )
 
-# ✅ SET webhook again automatically
 loop.run_until_complete(
     application.bot.set_webhook(f"{WEBHOOK_URL}/webhook")
 )
 
-loop.run_until_complete(application.start())
+print("✅ Webhook configured")
 
 
 @app.route("/")
@@ -40,7 +39,10 @@ def webhook():
     try:
         data = request.get_json(force=True)
         update = Update.de_json(data, application.bot)
-        loop.create_task(application.process_update(update))
+
+        # ✅ Directly run coroutine
+        loop.run_until_complete(application.process_update(update))
+
         return jsonify({"ok": True})
     except Exception as e:
         print("🔥 Webhook error:", e)
