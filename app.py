@@ -8,15 +8,20 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 app = Flask(__name__)
 
-# ✅ Create dedicated asyncio loop
+# ✅ Create event loop
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 
-# ✅ Setup telegram application
 application = setup_bot(TELEGRAM_TOKEN)
 
-# ✅ Initialize & start telegram app
+# ✅ Proper startup sequence
 loop.run_until_complete(application.initialize())
+
+# 🔥 IMPORTANT: clear old webhook & updates
+loop.run_until_complete(
+    application.bot.delete_webhook(drop_pending_updates=True)
+)
+
 loop.run_until_complete(application.start())
 
 
@@ -31,7 +36,6 @@ def webhook():
         data = request.get_json(force=True)
         update = Update.de_json(data, application.bot)
 
-        # ✅ Run inside event loop
         loop.create_task(application.process_update(update))
 
         return jsonify({"ok": True})
