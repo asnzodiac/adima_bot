@@ -1,33 +1,45 @@
 import os
+import asyncio
 from flask import Flask, request, jsonify
 from telegram import Update
 from bot import setup_bot
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 app = Flask(__name__)
+
+# ✅ Create dedicated asyncio event loop
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+
 application = setup_bot(TELEGRAM_TOKEN)
+
+# ✅ Initialize telegram application properly
+loop.run_until_complete(application.initialize())
+loop.run_until_complete(application.start())
+
 
 @app.route("/")
 def index():
     return "Bot is running ✅"
 
+
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    data = request.get_json(force=True)
-    update = Update.de_json(data, application.bot)
-    application.create_task(application.process_update(update))
-    return jsonify({"ok": True})
+    try:
+        data = request.get_json(force=True)
+        update = Update.de_json(data, application.bot)
 
-@app.route("/setwebhook")
-def set_webhook():
-    import requests
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook"
-    webhook_url = f"{WEBHOOK_URL}/webhook"
-    r = requests.post(url, json={"url": webhook_url})
-    return r.json()
+        # ✅ Run async processing inside our loop
+        loop.create_task(application.process_update(update))
 
-if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+        return jsonify({"ok": True})
+    except Exception as e:
+        print("Webhook error:", e)
+        return jsonify({"ok": False}), 200
+
+
+@app.route("/shutdown")
+def shutdown():
+    loop.run_until_complete(application.stop())
+    return "Shutting down..."
