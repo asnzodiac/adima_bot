@@ -8,6 +8,7 @@ GROQ_KEYS = [
     os.getenv("GROQ_API_KEY1"),
     os.getenv("GROQ_API_KEY2"),
     os.getenv("GROQ_API_KEY3"),
+    os.getenv("GROQ_API_KEY4"),
 ]
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
