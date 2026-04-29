@@ -42,30 +42,22 @@ api_usage = {
 # ==========================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    active_users[user_id] = True
+    print("✅ /start triggered")
+    active_users[update.effective_user.id] = True
+    await update.message.reply_text("✅ Bot is alive and listening!")
 
-    await update.message.reply_text(
-        "✅ I am now listening.\n\n"
-        "Send /stop to enter standby mode."
-    )
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    active_users[user_id] = False
+    active_users[update.effective_user.id] = False
+    await update.message.reply_text("🛑 Standby mode activated.")
 
-    await update.message.reply_text(
-        "🛑 Standby mode activated.\n"
-        "Send /start to resume."
-    )
 
 async def health(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID:
         return
 
     await update.message.reply_text(
-        "✅ Bot Status: Healthy\n\n"
-        f"API Usage:\n{api_usage}"
+        f"✅ Bot Status: Healthy\n\nAPI Usage:\n{api_usage}"
     )
 
 # ==========================
@@ -73,16 +65,27 @@ async def health(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==========================
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-
-    # If user in standby mode → ignore
-    if not active_users.get(user_id, True):
-        return
-
-    text = update.message.text
-    lang = detect_language(text)
 
     try:
+        if not update.message:
+            print("❌ No message in update")
+            return
+
+        if not update.message.text:
+            print("❌ No text in message")
+            return
+
+        user_id = update.effective_user.id
+
+        if not active_users.get(user_id, True):
+            print("User in standby mode")
+            return
+
+        text = update.message.text
+        print("📩 Received:", text)
+
+        lang = detect_language(text)
+
         # ===== SMART ROUTING =====
 
         if "weather" in text.lower():
@@ -107,18 +110,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             api_usage["llm"] += 1
             reply = ask_llm(text)
 
-        # ===== SEND TEXT =====
+        # ✅ Always ensure reply exists
+        if not reply:
+            reply = "I couldn't generate a response."
+
+        # ✅ SEND TEXT
         await update.message.reply_text(reply)
 
-        # ===== SEND VOICE =====
-        voice_path = generate_voice(reply, lang)
-
-        with open(voice_path, "rb") as audio:
-            await update.message.reply_voice(audio)
+        # ✅ SEND VOICE
+        try:
+            voice_path = generate_voice(reply, lang)
+            with open(voice_path, "rb") as audio:
+                await update.message.reply_voice(audio)
+        except Exception as voice_error:
+            print("⚠ Voice generation failed:", voice_error)
 
     except Exception as e:
-        logger.error(f"Error: {e}")
-        await update.message.reply_text("⚠ Something went wrong. Please try again.")
+        print("🔥 Handler crashed:", e)
+        try:
+            await update.message.reply_text("⚠ Something went wrong.")
+        except:
+            pass
+
 
 # ==========================
 # SETUP FUNCTION
