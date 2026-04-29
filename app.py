@@ -5,21 +5,26 @@ from telegram import Update
 from bot import setup_bot
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 app = Flask(__name__)
 
-# ✅ Create event loop
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 
 application = setup_bot(TELEGRAM_TOKEN)
 
-# ✅ Proper startup sequence
+# ✅ Proper startup
 loop.run_until_complete(application.initialize())
 
-# 🔥 IMPORTANT: clear old webhook & updates
+# ✅ Clear old webhook
 loop.run_until_complete(
     application.bot.delete_webhook(drop_pending_updates=True)
+)
+
+# ✅ SET webhook again automatically
+loop.run_until_complete(
+    application.bot.set_webhook(f"{WEBHOOK_URL}/webhook")
 )
 
 loop.run_until_complete(application.start())
@@ -35,9 +40,7 @@ def webhook():
     try:
         data = request.get_json(force=True)
         update = Update.de_json(data, application.bot)
-
         loop.create_task(application.process_update(update))
-
         return jsonify({"ok": True})
     except Exception as e:
         print("🔥 Webhook error:", e)
